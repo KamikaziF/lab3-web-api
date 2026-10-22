@@ -41,14 +41,14 @@ class EmployeeController(
     fun newEmployee(
         @RequestBody newEmployee: Employee,
     ): ResponseEntity<Employee> {
-        newEmployee.id = null       //Deletes the id so it's safe to insert in DB
+        newEmployee.id = null // Deletes the id so it's safe to insert in DB
         val employee = repository.save(newEmployee)
-        val location =          //Gets current mapping of the URI, and creates the new URI for the new id for the employee
+        val location = // Gets current mapping of the URI, and creates the new URI for the new id for the employee
             ServletUriComponentsBuilder
                 .fromCurrentServletMapping()
                 .path("/employees/{id}")
                 .build(employee.id)
-        return ResponseEntity.created(location).body(employee)  //Variables are saved in threads
+        return ResponseEntity.created(location).body(employee) // Variables are saved in threads
     }
 
     /**

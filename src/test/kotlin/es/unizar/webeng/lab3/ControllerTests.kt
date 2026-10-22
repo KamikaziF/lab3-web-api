@@ -1,6 +1,9 @@
 package es.unizar.webeng.lab3
 
 import com.ninjasquad.springmockk.MockkBean
+import io.mockk.every
+import io.mockk.justRun
+import io.mockk.verify
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
@@ -12,10 +15,6 @@ import org.springframework.test.web.servlet.delete
 import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.post
 import org.springframework.test.web.servlet.put
-
-import io.mockk.every
-import io.mockk.justRun
-import io.mockk.verify
 import java.util.Optional
 
 private val MANAGER_REQUEST_BODY = { name: String ->
@@ -57,11 +56,10 @@ class ControllerTests {
 
     @Test
     fun `POST is not safe and not idempotent`() {
-
         // Initial state: the collection is empty. No employee exists.
         // Runtime state: the first save stores Mary, Manager, as id 1. The second save stores Mary, Manager, as id 2.
-        
-        //save returns a new id on each call
+
+        // save returns a new id on each call
         every {
             employeeRepository.save(any<Employee>())
         } answers {
@@ -98,15 +96,14 @@ class ControllerTests {
                 }
             }
 
-
         // Hint: What repository methods should be called for a POST operation?
         // What methods should NOT be called? Think about the difference between safe and unsafe operations.
-        
-        //Both saves discard the client id
+
+        // Both saves discard the client id
         verify(exactly = 2) {
             employeeRepository.save(Employee("Mary", "Manager", null))
         }
-        //No read or delete
+        // No read or delete
         verify(exactly = 0) {
             employeeRepository.findById(any())
             employeeRepository.findAll()
@@ -119,14 +116,14 @@ class ControllerTests {
         // SETUP
         // Initial state: /employees/1 is Mary, Manager, id 1. /employees/2 has no representation.
         // Runtime state: both stay that way.
-        
-        //findById returns an employee for id 1
+
+        // findById returns an employee for id 1
         every {
             employeeRepository.findById(1)
         } answers {
             Optional.of(Employee("Mary", "Manager", 1))
         }
-        //findById returns empty for id 2
+        // findById returns empty for id 2
         every {
             employeeRepository.findById(2)
         } answers {
@@ -160,16 +157,16 @@ class ControllerTests {
         // VERIFY
         // Hint: Since GET is safe, what repository methods should NOT be called?
         // Count how many times each method was called based on the test requests.
-        
-        //findById(1) was called twice
+
+        // findById(1) was called twice
         verify(exactly = 2) {
             employeeRepository.findById(1)
         }
-        //findById(2) was called twice
+        // findById(2) was called twice
         verify(exactly = 2) {
             employeeRepository.findById(2)
         }
-        //no modifying methods were called
+        // no modifying methods were called
         verify(exactly = 0) {
             employeeRepository.save(any())
             employeeRepository.deleteById(any())
@@ -182,17 +179,17 @@ class ControllerTests {
         // SETUP
         // Initial state: /employees/1 has no representation.
         // Runtime state: the first PUT stores Tom, Manager, at id 1. The second PUT leaves that same employee.
-        
-        //findById is empty, then returns the employee
+
+        // findById is empty, then returns the employee
         every {
             employeeRepository.findById(1)
         } answers {
             Optional.empty()
         } andThenAnswer {
-            Optional.of(Employee("Tom", "Manager", 1)) //This is answered when findById is called the 2nd time
+            Optional.of(Employee("Tom", "Manager", 1)) // This is answered when findById is called the 2nd time
         }
-        
-        //Save returns the employee at id 1
+
+        // Save returns the employee at id 1
         every {
             employeeRepository.save(any<Employee>())
         } answers {
@@ -230,12 +227,12 @@ class ControllerTests {
         // VERIFY
         // Hint: What repository methods should be called for PUT operations?
         // Think about the controller logic and how many times each method should be invoked.
-        
-        //both saves store the same employee
+
+        // both saves store the same employee
         verify(exactly = 2) {
             employeeRepository.save(Employee("Tom", "Manager", 1))
         }
-        //no delete or list
+        // no delete or list
         verify(exactly = 0) {
             employeeRepository.deleteById(any())
             employeeRepository.findAll()
@@ -246,8 +243,14 @@ class ControllerTests {
     fun `DELETE is idempotent but not safe`() {
         // SETUP
         // Initial state: /employees/1 is associated with an employee.
-        // Runtime state: the first DELETE removes that association. The second DELETE finds it already gone.
-        TODO("Complete the mock setup for DELETE test")
+        // Runtime state: the first DELETE removes that association. The second DELETE finds it already gone
+
+        // deleteById may be called
+        // justRun stubs a method that returns nothing.
+        justRun {
+            employeeRepository.deleteById(1)
+        }
+
         mvc.delete("/employees/1").andExpect {
             status { isNoContent() }
         }
@@ -259,22 +262,29 @@ class ControllerTests {
         // VERIFY
         // Hint: What repository methods should be called for DELETE operations?
         // What methods should NOT be called? Think about the nature of DELETE operations.
-        TODO("Complete the verification for DELETE test")
+
+        // deleteById was called twice, and nothing else
+        verify(exactly = 2) {
+            employeeRepository.deleteById(1)
+        }
+        verify(exactly = 0) {
+            employeeRepository.save(any())
+            employeeRepository.findById(any())
+            employeeRepository.findAll()
+        }
     }
 
     @Test
     fun `GET collection is safe and idempotent`() {
-        // SETUP - COMPLETE ME!
+        // SETUP
         // Initial state: the collection contains exactly Mary, Manager, id 1.
         // Runtime state: the second GET sees that same list.
-        TODO("Complete the mock setup for the collection GET")
 
-        mvc.get("/employees").andExpect {
-            status { isOk() }
-            content {
-                contentType(MediaType.APPLICATION_JSON)
-                json(MANAGER_LIST_BODY)
-            }
+        // findAll returns one employee
+        every {
+            employeeRepository.findAll()
+        } answers {
+            listOf(Employee("Mary", "Manager", 1))
         }
 
         mvc.get("/employees").andExpect {
@@ -285,8 +295,26 @@ class ControllerTests {
             }
         }
 
-        // VERIFY - COMPLETE ME!
+        mvc.get("/employees").andExpect {
+            status { isOk() }
+            content {
+                contentType(MediaType.APPLICATION_JSON)
+                json(MANAGER_LIST_BODY)
+            }
+        }
+
+        // VERIFY
         // Hint: Count the list calls. A safe list must not save, delete, or fetch one id.
-        TODO("Complete the verification for the collection GET")
+
+        // findAll was called twice
+        verify(exactly = 2) {
+            employeeRepository.findAll()
+        }
+        // the list does not write or read one id
+        verify(exactly = 0) {
+            employeeRepository.save(any())
+            employeeRepository.deleteById(any())
+            employeeRepository.findById(any())
+        }
     }
 }
