@@ -13,6 +13,11 @@ import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.post
 import org.springframework.test.web.servlet.put
 
+import io.mockk.every
+import io.mockk.justRun
+import io.mockk.verify
+import java.util.Optional
+
 private val MANAGER_REQUEST_BODY = { name: String ->
     """
     { 
@@ -52,10 +57,18 @@ class ControllerTests {
 
     @Test
     fun `POST is not safe and not idempotent`() {
-        // SETUP - COMPLETE ME!
+
         // Initial state: the collection is empty. No employee exists.
         // Runtime state: the first save stores Mary, Manager, as id 1. The second save stores Mary, Manager, as id 2.
-        TODO("Complete the mock setup for POST test")
+        
+        //save returns a new id on each call
+        every {
+            employeeRepository.save(any<Employee>())
+        } answers {
+            Employee("Mary", "Manager", 1)
+        } andThenAnswer {
+            Employee("Mary", "Manager", 2)
+        }
 
         mvc
             .post("/employees") {
@@ -85,10 +98,20 @@ class ControllerTests {
                 }
             }
 
-        // VERIFY - COMPLETE ME!
+
         // Hint: What repository methods should be called for a POST operation?
         // What methods should NOT be called? Think about the difference between safe and unsafe operations.
-        TODO("Complete the verification for POST test")
+        
+        //Both saves discard the client id
+        verify(exactly = 2) {
+            employeeRepository.save(Employee("Mary", "Manager", null))
+        }
+        //No read or delete
+        verify(exactly = 0) {
+            employeeRepository.findById(any())
+            employeeRepository.findAll()
+            employeeRepository.deleteById(any())
+        }
     }
 
     @Test
@@ -96,7 +119,19 @@ class ControllerTests {
         // SETUP
         // Initial state: /employees/1 is Mary, Manager, id 1. /employees/2 has no representation.
         // Runtime state: both stay that way.
-        TODO("Complete the mock setup for GET test")
+        
+        //findById returns an employee for id 1
+        every {
+            employeeRepository.findById(1)
+        } answers {
+            Optional.of(Employee("Mary", "Manager", 1))
+        }
+        //findById returns empty for id 2
+        every {
+            employeeRepository.findById(2)
+        } answers {
+            Optional.empty()
+        }
 
         mvc.get("/employees/1").andExpect {
             status { isOk() }
@@ -122,10 +157,24 @@ class ControllerTests {
             status { isNotFound() }
         }
 
-        // VERIFY - COMPLETE ME!
+        // VERIFY
         // Hint: Since GET is safe, what repository methods should NOT be called?
         // Count how many times each method was called based on the test requests.
-        TODO("Complete the verification for GET test")
+        
+        //findById(1) was called twice
+        verify(exactly = 2) {
+            employeeRepository.findById(1)
+        }
+        //findById(2) was called twice
+        verify(exactly = 2) {
+            employeeRepository.findById(2)
+        }
+        //no modifying methods were called
+        verify(exactly = 0) {
+            employeeRepository.save(any())
+            employeeRepository.deleteById(any())
+            employeeRepository.findAll()
+        }
     }
 
     @Test
@@ -133,7 +182,22 @@ class ControllerTests {
         // SETUP
         // Initial state: /employees/1 has no representation.
         // Runtime state: the first PUT stores Tom, Manager, at id 1. The second PUT leaves that same employee.
-        TODO("Complete the mock setup for PUT test")
+        
+        //findById is empty, then returns the employee
+        every {
+            employeeRepository.findById(1)
+        } answers {
+            Optional.empty()
+        } andThenAnswer {
+            Optional.of(Employee("Tom", "Manager", 1)) //This is answered when findById is called the 2nd time
+        }
+        
+        //Save returns the employee at id 1
+        every {
+            employeeRepository.save(any<Employee>())
+        } answers {
+            Employee("Tom", "Manager", 1)
+        }
 
         mvc
             .put("/employees/1") {
@@ -163,10 +227,19 @@ class ControllerTests {
                 }
             }
 
-        // VERIFY - COMPLETE ME!
+        // VERIFY
         // Hint: What repository methods should be called for PUT operations?
         // Think about the controller logic and how many times each method should be invoked.
-        TODO("Complete the verification for PUT test")
+        
+        //both saves store the same employee
+        verify(exactly = 2) {
+            employeeRepository.save(Employee("Tom", "Manager", 1))
+        }
+        //no delete or list
+        verify(exactly = 0) {
+            employeeRepository.deleteById(any())
+            employeeRepository.findAll()
+        }
     }
 
     @Test
